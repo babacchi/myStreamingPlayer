@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="utf-8"?>
+<mx:Application xmlns:mx="http://www.adobe.com/2006/mxml"
+				xmlns:media="flash.media.*"
+				width="840" height="326" backgroundAlpha="1" backgroundColor="0xffffff"
+				creationComplete="init()" layout="absolute">
+	<mx:Script>
+		<![CDATA[
+			import mx.core.UIComponent;
+			import mx.controls.Alert;
+			
+			private var nc:NetConnection;
+			private var ns:NetStream;
+			private var so:SharedObject;
+			
+			private var vwidth:int=320;
+			private var vheight:int=240;
+			
+			private var cam:Camera;
+			private var mic:Microphone;
+			private var rtmp:String="rtmp://localhost/streamingSample";
+			private var stream:String="user01";
+			private function init():void{
+				nc = new NetConnection();
+				nc.client = new CustomClient();
+				nc.connect(rtmp);
+				nc.addEventListener(NetStatusEvent.NET_STATUS,onNetStatus);
+				nc.addEventListener(SecurityErrorEvent.SECURITY_ERROR,onSecurityError);
+			}
+			
+			private function onNetStatus(evt:NetStatusEvent):void {
+				//trace( "onNetstatus" );
+				switch(evt.info.code) {
+					case "NetConnection.Connect.Success":
+						setupCameraMic();
+						initSO();
+						trace("Success");
+						break;
+					case "NetConnection.Connect.Closed":
+						trace("Closed");
+						break;
+					case "NetConnection.Connect.Failed":
+						trace("Failed");
+						break;
+					case "NetConnection.Connect.Rejected":
+						trace("Rejected");
+						break;
+					default:
+				}
+			}
+			private function onSecurityError(evt:SecurityErrorEvent):void {
+				trace("Security Error");
+			}
+			
+			private function setupCameraMic():void{
+				ns = new NetStream( nc );
+				ns.bufferTime=1;
+				ns.client = new CustomClient();
+				var video:Video = new Video();
+				
+				video.height=vheight;
+				video.width=vwidth;
+				
+				video.attachNetStream(ns);
+				ns.play(stream , -1 );
+				myVideoContainer.addChild(video);
+				
+				
+			}    
+			private function onMetaData(data:Object):void{
+			}
+			private function initSO():void{
+				//trace( "initSO" );
+				so = SharedObject.getRemote( stream , nc.uri , true );
+				if( so ){
+					so.addEventListener( SyncEvent.SYNC , function( evt:SyncEvent ):void{
+						//trace( so.data.chatMessage );
+						if( so.data.chatMessage != undefined ){
+							history.htmlText += so.data.name + "さん ";
+							history.htmlText += so.data.chatMessage +"<br>" ;   
+						}
+					});
+					so.connect(nc);
+				}
+			}
+			private function sendMessage():void{
+				//trace( "sendMessage" );
+				if(nameinput.text == "配信者"){
+					Alert.show("その名前は使用できません。")
+				}
+				else if (message.text != "" && nameinput.text !="" ){
+					//trace( "sendMessage2" );
+					so.setProperty( "name" , nameinput.text);
+					so.setProperty( "chatMessage" , message.text );
+					message.text = ""; 
+				}else{
+					Alert.show("コメントもしくはお名前が入力されていません。")
+				}
+			}
+		]]>
+	</mx:Script>
+	<media:Video id="myVideo" width="320" height="240"/>
+	<mx:Canvas x="33" y="40" width="340" height="260"
+			   backgroundAlpha="0.5" backgroundColor="0xffffff">
+		<mx:VideoDisplay id="myVideoContainer" width="320" height="240" x="8" y="10"/>
+	</mx:Canvas>
+	<mx:TextInput id="message" x="493" y="286" width="211" enter="sendMessage()" />
+	<mx:TextArea id="history" x="383" y="40" width="424" height="230" editable="false"/>
+	<mx:Button id="btn" x="712" y="285" label="コメントする" width="95" click="sendMessage()" height="24"/>
+	<mx:TextInput id="nameinput" x="383" y="286" width="102" text="no name"/>
+	
+
+</mx:Application>
